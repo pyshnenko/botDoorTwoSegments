@@ -64,46 +64,49 @@ async function bootstrap() {
         };
 
         const sendToPi = async (action: string): Promise<any> => {
-            // 1. Сначала проверяем на null и статус соединения
             if (!rpiSocket || rpiSocket.readyState !== WebSocket.OPEN) {
                 return { error: 'Raspberry Pi не в сети' };
             }
 
-            // Сохраняем ссылку на сокет в локальную переменную для стабильности внутри Promise
-            const socket = rpiSocket;
             const startTime = Date.now();
+            const socket = rpiSocket;
 
             return new Promise((resolve) => {
-                const handler = (data: any) => {
-                    try {
-                        const resp = JSON.parse(data.toString());
-                        const endTime = Date.now();
-                        const ping = endTime - startTime;
-
-                        const isNetworkResponse = action === 'get_network_info' && (resp.type === 'network_info' || resp.data);
-                        const isCommandResponse = action !== 'get_network_info' && (resp.type === 'success' || resp.type === 'status' || resp.type === 'error');
-
-                        if (isNetworkResponse || isCommandResponse) {
-                            clearTimeout(timer);
-                            resolve({ ...resp.data, message: resp.message, ping, success: true });
-                        } else {
-                            // Если сообщение не то, слушаем следующее
-                            socket.once('message', handler);
-                        }
-                    } catch (e) {
-                        socket.once('message', handler);
-                    }
-                };
-
                 const payload = JSON.stringify({ action, timestamp: startTime });
                 socket.send(payload);
 
+                // Увеличили таймаут до 20 000 мс (20 секунд)
                 const timer = setTimeout(() => {
                     socket.removeListener('message', handler);
-                    resolve({ error: 'Таймаут: Raspberry не ответила' });
-                }, 7000);
+                    resolve({ error: 'Таймаут: Raspberry не ответила (20 сек)' });
+                }, 20000); 
 
-                socket.once('message', handler);
+                const handler = (data: any) => {
+                    try {
+                        const resp = JSON.parse(data.toString());
+                        
+                        const isRelevant = 
+                            (action === 'get_network_info' && (resp.type === 'network_info' || resp.data)) ||
+                            (action !== 'get_network_info' && (resp.type === 'success' || resp.type === 'error' || resp.type === 'status'));
+
+                        if (isRelevant) {
+                            clearTimeout(timer);
+                            socket.removeListener('message', handler);
+                            
+                            const endTime = Date.now();
+                            resolve({ 
+                                ...(resp.data || {}), 
+                                message: resp.message, 
+                                success: resp.type !== 'error',
+                                ping: endTime - startTime 
+                            });
+                        }
+                    } catch (e) {
+                        // Игнорируем не-JSON сообщения (например, Heartbeat пинги)
+                    }
+                };
+
+                socket.on('message', handler);
             });
         };
 
