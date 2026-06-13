@@ -1,0 +1,27 @@
+{
+  "name": "gate-controller-server",
+  "version": "1.0.0",
+  "description": "External Server for Raspberry Pi Gates",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts",
+    "postinstall": "tsc"
+  },
+  "dependencies": {
+    "axios": "^1.6.0",
+    "dotenv": "^16.6.1",
+    "mysql2": "^3.22.5",
+    "sequelize": "^6.37.8",
+    "socks-proxy-agent": "^10.1.0",
+    "telegraf": "^4.16.3",
+    "ws": "^8.21.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.43",
+    "@types/ws": "^8.18.1",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.9.3"
+  }
+}
