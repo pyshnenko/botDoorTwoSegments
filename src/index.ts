@@ -339,14 +339,15 @@ async function bootstrap() {
                 ]));
             }
 
-        const text = `
+const text = `
 📡 *Статус соединения:*
 ✅ Raspberry Pi в сети
 
-🏠 *Локальный IP:* \`${result.localIp || 'не определен'}\`
-🌍 *Внешний IP:* \`${result.externalIp || 'не определен'}\`
+🏠 *Локальный IP:* \`${result.localIp}\`
+🌍 *Внешний IP:* \`${result.externalIp}\`
 📶 *Wi-Fi сеть:* \`${result.ssid}\`
 📊 *Сигнал:* \`${result.signal}\`
+🌡 *Температура:* \`${result.temp || 'n/a'}\`
 ⚡ *Задержка (Ping):* \`${result.ping} мс\`
 ⏱ *Uptime:* \`${result.uptime}\`
 `;
