@@ -248,12 +248,6 @@ async function bootstrap() {
             });
         });
 
-        bot.action('connection_status', async (ctx) => {
-            const status = rpiSocket && rpiSocket.readyState === WebSocket.OPEN ? '✅ Raspberry Pi в сети' : '❌ Нет связи с Raspberry Pi';
-            
-            await ctx.answerCbQuery(status, { show_alert: true });
-        });
-
         bot.action(/approve_(\d+)/, async (ctx) => {
             const targetId = ctx.match[1];
             await User.update({ role: 'user' }, { where: { tgId: targetId } });
@@ -276,20 +270,6 @@ async function bootstrap() {
             return ctx.editMessageText('✅ Журнал событий успешно очищен.', Markup.inlineKeyboard([
                 [Markup.button.callback('⬅️ В меню', 'admin_main')]
             ]));
-        });
-
-        // Кнопка перезагрузки в "Состояние соединения"
-        bot.action('connection_status', async (ctx) => {
-            const isOnline = rpiSocket && rpiSocket.readyState === WebSocket.OPEN;
-            const statusText = isOnline ? '✅ Raspberry Pi в сети' : '❌ Нет связи с Raspberry Pi';
-            
-            const buttons = [[Markup.button.callback('⬅️ Назад', 'admin_main')]];
-            if (isOnline) {
-                buttons.unshift([Markup.button.callback('🔄 Перезагрузить Raspberry', 'reboot_pi_confirm')]);
-            }
-
-            await ctx.deleteMessage();
-            return ctx.reply(statusText, Markup.inlineKeyboard(buttons));
         });
 
         // Подтверждение перезагрузки малинки
