@@ -63,24 +63,25 @@ async function bootstrap() {
             return Markup.keyboard(buttons).resize();
         };
 
-        const sendToPi = async (action: string): Promise<string> => {
+        const sendToPi = async (action: string): Promise<any> => {
             if (!rpiSocket || rpiSocket.readyState !== WebSocket.OPEN) {
-                return 'Ошибка: Нет связи с Raspberry Pi';
+                return { error: 'Raspberry Pi не в сети' };
             }
 
             return new Promise((resolve) => {
                 const payload = JSON.stringify({ action, timestamp: Date.now() });
                 rpiSocket?.send(payload);
 
-                const timer = setTimeout(() => resolve('Таймаут: Raspberry не ответила'), 7000);
+                const timer = setTimeout(() => resolve({ error: 'Таймаут: Raspberry не ответила' }), 7000);
 
                 rpiSocket?.once('message', (data) => {
                     clearTimeout(timer);
                     try {
                         const resp = JSON.parse(data.toString());
-                        resolve(resp.type === 'error' ? resp.message : 'Команда выполнена');
+                        // Возвращаем либо весь объект данных, либо сообщение об успехе
+                        resolve(resp.data || { success: true, message: resp.message });
                     } catch (e) {
-                        resolve('Ошибка в ответе от Raspberry');
+                        resolve({ error: 'Ошибка парсинга ответа' });
                     }
                 });
             });
@@ -306,6 +307,45 @@ async function bootstrap() {
             return ctx.editMessageText(`Результат: ${result}`, Markup.inlineKeyboard([
                 [Markup.button.callback('⬅️ В меню', 'admin_main')]
             ]));
+        });
+
+        bot.action('connection_status', async (ctx) => {
+            const isOnline = rpiSocket && rpiSocket.readyState === WebSocket.OPEN;
+
+            if (!isOnline) {
+                return ctx.answerCbQuery('❌ Raspberry Pi не в сети', { show_alert: true });
+            }
+
+            await ctx.answerCbQuery('📡 Запрашиваю данные...');
+            await ctx.editMessageText('⌛ Получаю информацию от Raspberry Pi...');
+
+            const result = await sendToPi('get_network_info');
+
+            if (result.error) {
+                return ctx.editMessageText(`❌ Ошибка: ${result.error}`, Markup.inlineKeyboard([
+                    [Markup.button.callback('⬅️ Назад', 'admin_main')]
+                ]));
+            }
+
+            const text = `
+        📡 *Статус соединения:*
+        ✅ Raspberry Pi в сети
+
+        🏠 *Локальный IP:* \`${result.localIp}\`
+        🌍 *Внешний IP:* \`${result.externalIp}\`
+        📶 *Wi-Fi сеть:* \`${result.ssid}\`
+        📊 *Сигнал:* \`${result.signal}%\`
+        ⏱ *Uptime:* \`${result.uptime}\`
+            `;
+
+            return ctx.editMessageText(text, {
+                parse_mode: 'Markdown',
+                ...Markup.inlineKeyboard([
+                    [Markup.button.callback('🔄 Обновить', 'connection_status')],
+                    [Markup.button.callback('🔄 Перезагрузить RPi', 'reboot_pi_confirm')],
+                    [Markup.button.callback('⬅️ Назад', 'admin_main')]
+                ])
+            });
         });
 
         // ЗАПУСК БОТА
