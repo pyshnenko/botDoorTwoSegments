@@ -64,52 +64,46 @@ async function bootstrap() {
         };
 
         const sendToPi = async (action: string): Promise<any> => {
+            // 1. Сначала проверяем на null и статус соединения
             if (!rpiSocket || rpiSocket.readyState !== WebSocket.OPEN) {
                 return { error: 'Raspberry Pi не в сети' };
             }
 
+            // Сохраняем ссылку на сокет в локальную переменную для стабильности внутри Promise
+            const socket = rpiSocket;
             const startTime = Date.now();
 
             return new Promise((resolve) => {
-                const payload = JSON.stringify({ action, timestamp: startTime });
-                rpiSocket?.send(payload);
-
-                const timer = setTimeout(() => {
-                    // Удаляем временный слушатель, если вышел таймаут
-                    rpiSocket?.removeListener('message', messageHandler);
-                    resolve({ error: 'Таймаут: Raspberry не ответила' });
-                }, 7000);
-
-                // Создаем именованную функцию-обработчик, чтобы её можно было фильтровать
-                const messageHandler = (data: Buffer | string) => {
+                const handler = (data: any) => {
                     try {
                         const resp = JSON.parse(data.toString());
                         const endTime = Date.now();
                         const ping = endTime - startTime;
 
-                        // ВАЖНО: Проверяем, на ту ли команду пришел ответ
-                        // Для статуса сети ищем 'network_info', для остального — успех/ошибку
-                        const isNetworkAction = action === 'get_network_info' && resp.type === 'network_info';
-                        const isStatusAction = (action === 'open_gate' || action === 'close_gate' || action === 'reboot_pi') && (resp.type === 'success' || resp.type === 'status' || resp.type === 'error');
+                        const isNetworkResponse = action === 'get_network_info' && (resp.type === 'network_info' || resp.data);
+                        const isCommandResponse = action !== 'get_network_info' && (resp.type === 'success' || resp.type === 'status' || resp.type === 'error');
 
-                        if (isNetworkAction || isStatusAction) {
+                        if (isNetworkResponse || isCommandResponse) {
                             clearTimeout(timer);
-                            rpiSocket?.removeListener('message', messageHandler); // Удаляем слушатель после успеха
-
-                            if (resp.data) {
-                                resolve({ ...resp.data, ping });
-                            } else {
-                                resolve({ success: true, message: resp.message || 'ОК', ping });
-                            }
+                            resolve({ ...resp.data, message: resp.message, ping, success: true });
+                        } else {
+                            // Если сообщение не то, слушаем следующее
+                            socket.once('message', handler);
                         }
                     } catch (e) {
-                        // Если пришел не JSON, просто игнорируем или логируем
+                        socket.once('message', handler);
                     }
                 };
 
-                // Используем 'on' вместо 'once' и фильтруем внутри, 
-                // так как могут прилетать другие системные сообщения
-                rpiSocket?.on('message', messageHandler);
+                const payload = JSON.stringify({ action, timestamp: startTime });
+                socket.send(payload);
+
+                const timer = setTimeout(() => {
+                    socket.removeListener('message', handler);
+                    resolve({ error: 'Таймаут: Raspberry не ответила' });
+                }, 7000);
+
+                socket.once('message', handler);
             });
         };
 
