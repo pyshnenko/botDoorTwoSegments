@@ -151,11 +151,20 @@ async function bootstrap() {
             if (!user || user.role === 'pending') return ctx.reply('Доступ запрещен');
 
             const action = ctx.message.text;
+            ctx.reply(`Отправляю команду ${action.toLowerCase()}...`);
+            
             const result = await sendToPi(action === 'Открыть' ? 'open_gate' : 'close_gate');
             
+            // ПРОВЕРКА: Если пришел объект, берем из него поле message или success
+            if (typeof result === 'object') {
+                const text = result.message || (result.success ? 'Команда выполнена успешно' : 'Произошла ошибка');
+                ctx.reply(text);
+            } else {
+                ctx.reply(result); // Если пришла обычная строка
+            }
+
             // Записываем лог
             await Log.create({ tgId: ctx.from.id, username: ctx.from.username || 'unknown', action });
-            ctx.reply(result);
         });
 
         bot.hears('Управление', async (ctx) => {
