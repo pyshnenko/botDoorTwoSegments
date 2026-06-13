@@ -68,18 +68,27 @@ async function bootstrap() {
                 return { error: 'Raspberry Pi не в сети' };
             }
 
+            const startTime = Date.now(); // Засекаем время отправки
+
             return new Promise((resolve) => {
-                const payload = JSON.stringify({ action, timestamp: Date.now() });
+                const payload = JSON.stringify({ action, timestamp: startTime });
                 rpiSocket?.send(payload);
 
                 const timer = setTimeout(() => resolve({ error: 'Таймаут: Raspberry не ответила' }), 7000);
 
                 rpiSocket?.once('message', (data) => {
                     clearTimeout(timer);
+                    const endTime = Date.now(); // Засекаем время получения ответа
+                    const ping = endTime - startTime; // Разница в мс
+
                     try {
                         const resp = JSON.parse(data.toString());
-                        // Возвращаем либо весь объект данных, либо сообщение об успехе
-                        resolve(resp.data || { success: true, message: resp.message });
+                        // Добавляем значение пинга в объект данных
+                        if (resp.data) {
+                            resolve({ ...resp.data, ping });
+                        } else {
+                            resolve({ success: true, message: resp.message, ping });
+                        }
                     } catch (e) {
                         resolve({ error: 'Ошибка парсинга ответа' });
                     }
@@ -308,15 +317,16 @@ async function bootstrap() {
             }
 
             const text = `
-        📡 *Статус соединения:*
-        ✅ Raspberry Pi в сети
+📡 *Статус соединения:*
+✅ Raspberry Pi в сети
 
-        🏠 *Локальный IP:* \`${result.localIp}\`
-        🌍 *Внешний IP:* \`${result.externalIp}\`
-        📶 *Wi-Fi сеть:* \`${result.ssid}\`
-        📊 *Сигнал:* \`${result.signal}%\`
-        ⏱ *Uptime:* \`${result.uptime}\`
-            `;
+🏠 *Локальный IP:* \`${result.localIp}\`
+🌍 *Внешний IP:* \`${result.externalIp}\`
+📶 *Wi-Fi сеть:* \`${result.ssid}\`
+📊 *Сигнал:* \`${result.signal}%\`
+⚡ *Задержка (Ping):* \`${result.ping} мс\`
+⏱ *Uptime:* \`${result.uptime}\`
+    `;
 
             return ctx.editMessageText(text, {
                 parse_mode: 'Markdown',
