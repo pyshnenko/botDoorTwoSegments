@@ -68,31 +68,48 @@ async function bootstrap() {
                 return { error: 'Raspberry Pi не в сети' };
             }
 
-            const startTime = Date.now(); // Засекаем время отправки
+            const startTime = Date.now();
 
             return new Promise((resolve) => {
                 const payload = JSON.stringify({ action, timestamp: startTime });
                 rpiSocket?.send(payload);
 
-                const timer = setTimeout(() => resolve({ error: 'Таймаут: Raspberry не ответила' }), 7000);
+                const timer = setTimeout(() => {
+                    // Удаляем временный слушатель, если вышел таймаут
+                    rpiSocket?.removeListener('message', messageHandler);
+                    resolve({ error: 'Таймаут: Raspberry не ответила' });
+                }, 7000);
 
-                rpiSocket?.once('message', (data) => {
-                    clearTimeout(timer);
-                    const endTime = Date.now(); // Засекаем время получения ответа
-                    const ping = endTime - startTime; // Разница в мс
-
+                // Создаем именованную функцию-обработчик, чтобы её можно было фильтровать
+                const messageHandler = (data: Buffer | string) => {
                     try {
                         const resp = JSON.parse(data.toString());
-                        // Добавляем значение пинга в объект данных
-                        if (resp.data) {
-                            resolve({ ...resp.data, ping });
-                        } else {
-                            resolve({ success: true, message: resp.message, ping });
+                        const endTime = Date.now();
+                        const ping = endTime - startTime;
+
+                        // ВАЖНО: Проверяем, на ту ли команду пришел ответ
+                        // Для статуса сети ищем 'network_info', для остального — успех/ошибку
+                        const isNetworkAction = action === 'get_network_info' && resp.type === 'network_info';
+                        const isStatusAction = (action === 'open_gate' || action === 'close_gate' || action === 'reboot_pi') && (resp.type === 'success' || resp.type === 'status' || resp.type === 'error');
+
+                        if (isNetworkAction || isStatusAction) {
+                            clearTimeout(timer);
+                            rpiSocket?.removeListener('message', messageHandler); // Удаляем слушатель после успеха
+
+                            if (resp.data) {
+                                resolve({ ...resp.data, ping });
+                            } else {
+                                resolve({ success: true, message: resp.message || 'ОК', ping });
+                            }
                         }
                     } catch (e) {
-                        resolve({ error: 'Ошибка парсинга ответа' });
+                        // Если пришел не JSON, просто игнорируем или логируем
                     }
-                });
+                };
+
+                // Используем 'on' вместо 'once' и фильтруем внутри, 
+                // так как могут прилетать другие системные сообщения
+                rpiSocket?.on('message', messageHandler);
             });
         };
 
@@ -316,17 +333,17 @@ async function bootstrap() {
                 ]));
             }
 
-            const text = `
+        const text = `
 📡 *Статус соединения:*
 ✅ Raspberry Pi в сети
 
-🏠 *Локальный IP:* \`${result.localIp}\`
-🌍 *Внешний IP:* \`${result.externalIp}\`
+🏠 *Локальный IP:* \`${result.localIp || 'не определен'}\`
+🌍 *Внешний IP:* \`${result.externalIp || 'не определен'}\`
 📶 *Wi-Fi сеть:* \`${result.ssid}\`
-📊 *Сигнал:* \`${result.signal}%\`
+📊 *Сигнал:* \`${result.signal}\`
 ⚡ *Задержка (Ping):* \`${result.ping} мс\`
 ⏱ *Uptime:* \`${result.uptime}\`
-    `;
+`;
 
             return ctx.editMessageText(text, {
                 parse_mode: 'Markdown',
