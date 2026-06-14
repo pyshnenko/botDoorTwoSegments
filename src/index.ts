@@ -356,6 +356,7 @@ async function bootstrap() {
                     [Markup.button.callback('⬅️ Назад', 'admin_main')]
                 ]));
             }
+            const readableUptime = formatUptime(parseInt(result.uptime) || 0);
 
 const text = `
 📡 *Статус соединения:*
@@ -367,7 +368,7 @@ const text = `
 📊 *Сигнал:* \`${result.signal}\`
 🌡 *Температура:* \`${result.temp || 'n/a'}\`
 ⚡ *Задержка (Ping):* \`${result.ping} мс\`
-⏱ *Uptime:* \`${result.uptime}\`
+⏱ *Uptime:* \`${readableUptime}\`
 `;
 
             return ctx.editMessageText(text, {
@@ -392,6 +393,21 @@ const text = `
         console.error('>>> КРИТИЧЕСКАЯ ОШИБКА:', error.message);
         process.exit(1);
     }
+}
+
+function formatUptime(seconds: number): string {
+    const d = Math.floor(seconds / (3600 * 24));
+    const h = Math.floor((seconds % (3600 * 24)) / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = Math.floor(seconds % 60);
+
+    const parts = [];
+    if (d > 0) parts.push(`${d}д`);
+    if (h > 0) parts.push(`${h}ч`);
+    if (m > 0) parts.push(`${m}м`);
+    if (s > 0 || parts.length === 0) parts.push(`${s}с`);
+
+    return parts.join(' ');
 }
 
 bootstrap();
