@@ -4,6 +4,7 @@ import { User, sequelize } from './models/User';
 import dotenv from 'dotenv';
 import { Log } from './models/Log';
 import { Sequelize, DataTypes, Model, Op } from 'sequelize';
+import { createClient } from 'redis';
 
 dotenv.config();
 
@@ -28,7 +29,28 @@ async function bootstrap() {
             }
         });
         console.log('>>> СИСТЕМА: Старые логи удалены');
+        const redis = createClient();
+        redis.on('error', err => console.error('>>> REDIS: Ошибка', err));
+        await redis.connect();
+        console.log('>>> REDIS: Подключен');
 
+        async function getUserWithCache(tgId: number) {
+            const cacheKey = `user:${tgId}`;
+            
+            // Пытаемся взять из Redis
+            const cachedUser = await redis.get(cacheKey);
+            if (cachedUser) {
+                return JSON.parse(cachedUser);
+            }
+
+            // Если в кеше нет — идем в MySQL
+            const user = await User.findOne({ where: { tgId } });
+            if (user) {
+                // Сохраняем в кеш на 1 час (3600 сек)
+                await redis.set(cacheKey, JSON.stringify(user), { EX: 3600 });
+            }
+            return user;
+        }
         const bot = new Telegraf(process.env.TGBOT!); // Добавьте { telegram: { agent } } если вернете прокси
 
         // 3. WebSocket Сервер для Raspberry Pi
@@ -150,28 +172,22 @@ async function bootstrap() {
         });
 
         bot.hears(['Открыть', 'Закрыть'], async (ctx) => {
-            const user = await User.findOne({ where: { tgId: ctx.from.id } });
-            if (!user || user.role === 'pending') return ctx.reply('Доступ запрещен');
-
-            const action = ctx.message.text;
-            ctx.reply(`Отправляю команду ${action.toLowerCase()}...`);
+            // ТЕПЕРЬ ИСПОЛЬЗУЕМ КЕШ ВМЕСТО ПРЯМОГО ЗАПРОСА К MYSQL
+            const user = await getUserWithCache(ctx.from.id);
             
-            const result = await sendToPi(action === 'Открыть' ? 'open_gate' : 'close_gate');
-            
-            // ПРОВЕРКА: Если пришел объект, берем из него поле message или success
-            if (typeof result === 'object') {
-                const text = result.message || (result.success ? 'Команда выполнена успешно' : 'Произошла ошибка');
-                ctx.reply(text);
-            } else {
-                ctx.reply(result); // Если пришла обычная строка
+            if (!user || user.role === 'pending') {
+                return ctx.reply('Доступ запрещен или на рассмотрении.');
             }
 
-            // Записываем лог
-            await Log.create({ tgId: ctx.from.id, username: ctx.from.username || 'unknown', action });
+            const action = ctx.message.text === 'Открыть' ? 'open_gate' : 'close_gate';
+            const result = await sendToPi(action);
+            ctx.reply(typeof result === 'object' ? result.message : result);
+            
+            await Log.create({ tgId: ctx.from.id, username: ctx.from.username || 'unknown', action: ctx.message.text });
         });
 
         bot.hears('Управление', async (ctx) => {
-            const user = await User.findOne({ where: { tgId: ctx.from.id } });
+            const user = await getUserWithCache(ctx.from.id);
             if (user?.role !== 'admin') return;
 
             return ctx.reply('Меню администратора:', Markup.inlineKeyboard([
