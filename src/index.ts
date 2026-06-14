@@ -249,6 +249,7 @@ async function bootstrap() {
         bot.action(/set_role_(admin|user|delete)_(\d+)/, async (ctx) => {
             const role = ctx.match[1];
             const targetId = ctx.match[2];
+            await redis.del(`user:${targetId}`);
 
             if (role === 'delete') {
                 await User.destroy({ where: { tgId: targetId } });
@@ -298,6 +299,7 @@ async function bootstrap() {
 
         bot.action(/approve_(\d+)/, async (ctx) => {
             const targetId = ctx.match[1];
+            await redis.del(`user:${targetId}`);
             await User.update({ role: 'user' }, { where: { tgId: targetId } });
             ctx.answerCbQuery('Одобрено');
             bot.telegram.sendMessage(targetId, 'Доступ разрешен! Теперь вы можете управлять воротами.', mainKeyboard('user'));
