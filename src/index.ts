@@ -80,10 +80,9 @@ async function bootstrap() {
          * ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
          */
         const mainKeyboard = (role: string) => {
-            // Добавляем переносы строк по краям текста
-            const buttons = [['\nОткрыть\n', '\nЗакрыть\n']];
-            if (role === 'admin') buttons.push(['\nУправление\n']);
-            return Markup.keyboard(buttons).resize();
+            const buttons = [['Открыть', 'Закрыть']];
+            if (role === 'admin') buttons.push(['Управление']);
+            return Markup.keyboard(buttons);
         };
 
         const sendToPi = async (action: string): Promise<any> => {
