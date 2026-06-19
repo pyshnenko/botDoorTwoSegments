@@ -80,8 +80,9 @@ async function bootstrap() {
          * ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
          */
         const mainKeyboard = (role: string) => {
-            const buttons = [['Открыть', 'Закрыть']];
-            if (role === 'admin') buttons.push(['Управление']);
+            // Добавляем переносы строк по краям текста
+            const buttons = [['\nОткрыть\n', '\nЗакрыть\n']];
+            if (role === 'admin') buttons.push(['\nУправление\n']);
             return Markup.keyboard(buttons).resize();
         };
 
