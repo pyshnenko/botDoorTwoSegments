@@ -7,17 +7,7 @@ dotenv.config();
 const sequelize = new Sequelize(process.env.DB_NAME!, process.env.DB_USER!, process.env.DB_PASS!, {
     host: process.env.DB_HOST,
     dialect: 'mysql',
-    logging: false,
-    dialectOptions: {
-        // Добавляем явную типизацию для параметров DNS-лукапа
-        lookup: (
-            hostname: string, 
-            options: dns.LookupOneOptions, 
-            callback: (err: NodeJS.ErrnoException | null, address: string, family: number) => void
-        ) => {
-            dns.lookup(hostname, { family: 6 }, callback);
-        }
-    }
+    logging: false
 });
 
 export class User extends Model {
