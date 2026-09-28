@@ -1,6 +1,6 @@
 import { Sequelize, DataTypes, Model } from 'sequelize';
 import dotenv from 'dotenv';
-import dns from 'dns';
+import dns from 'dns'; // Нативный модуль Node.js
 
 dotenv.config();
 
@@ -9,7 +9,12 @@ const sequelize = new Sequelize(process.env.DB_NAME!, process.env.DB_USER!, proc
     dialect: 'mysql',
     logging: false,
     dialectOptions: {
-        lookup: (hostname, options, callback) => {
+        // Добавляем явную типизацию для параметров DNS-лукапа
+        lookup: (
+            hostname: string, 
+            options: dns.LookupOneOptions, 
+            callback: (err: NodeJS.ErrnoException | null, address: string, family: number) => void
+        ) => {
             dns.lookup(hostname, { family: 6 }, callback);
         }
     }
