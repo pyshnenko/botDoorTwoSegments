@@ -390,7 +390,7 @@ const text = `
         console.log('>>> СЕРВЕР: Полностью запущен и готов к работе!');
 
     } catch (error: any) {
-        console.error('>>> КРИТИЧЕСКАЯ ОШИБКА:', error.message);
+        console.error('>>> КРИТИЧЕСКАЯ ОШИБКА:', error);
         process.exit(1);
     }
 }
