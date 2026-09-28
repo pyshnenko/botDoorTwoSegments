@@ -1,6 +1,5 @@
 import { Sequelize, DataTypes, Model } from 'sequelize';
 import dotenv from 'dotenv';
-import dns from 'dns'; // Нативный модуль Node.js
 
 dotenv.config();
 
