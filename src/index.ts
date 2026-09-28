@@ -5,8 +5,11 @@ import dotenv from 'dotenv';
 import { Log } from './models/Log';
 import { Sequelize, DataTypes, Model, Op } from 'sequelize';
 import { createClient } from 'redis';
+import dns from 'dns';
 
 dotenv.config();
+
+dns.setDefaultResultOrder('ipv6first'); 
 
 /**
  * ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ
