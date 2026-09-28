@@ -1,5 +1,6 @@
 import { Sequelize, DataTypes, Model } from 'sequelize';
 import dotenv from 'dotenv';
+import dns from 'dns';
 
 dotenv.config();
 
@@ -8,7 +9,9 @@ const sequelize = new Sequelize(process.env.DB_NAME!, process.env.DB_USER!, proc
     dialect: 'mysql',
     logging: false,
     dialectOptions: {
-        family: 6 // IPv6
+        lookup: (hostname, options, callback) => {
+            dns.lookup(hostname, { family: 6 }, callback);
+        }
     }
 });
 
